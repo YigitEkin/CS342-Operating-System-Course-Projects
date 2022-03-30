@@ -1,6 +1,5 @@
 
 .DS_Store
-project1/histserver_th.dSYM/Contents/Info.plist
 *.plist
 *.o
 *.json
