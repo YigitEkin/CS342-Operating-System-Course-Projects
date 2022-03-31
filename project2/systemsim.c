@@ -5,19 +5,26 @@
 #include <string.h>
 #include <sys/types.h>
 #include "defs.h"
+#include <sys/time.h>
 
 #define min(x, y) (((x) < (y)) ? (x) : (y))
 
+// TODO: pcb update
+// TODO: time update
+// TODO: get input from terminal
+// TODO: print output to terminal
+struct timeval start_time, current_time;
 char outmode, *burst_dist;
 SchedulingAlgorithm scheduling_algorithm;
-int q, t1, t2, burstlen, min_burst, max_burst, maxp, allp, current_count, current_time, cpu_running_thread_count, thread_count;
+int q, t1, t2, burstlen, min_burst, max_burst, maxp, allp, current_count, cpu_running_thread_count, thread_count;
 int number_of_threads_left;
 int current_cpu_pid;
 int io1_count, io2_count;
 float p0, p1, p2, pg;
+long int start_time_val;
 pthread_t *threads;
 queue *ready_queue;
-pthread_mutex_t ready_queue_mutex, ready_queue_io1_mutex, ready_queue_io2_mutex, pid_mutex;
+pthread_mutex_t ready_queue_mutex, ready_queue_io1_mutex, ready_queue_io2_mutex, time_mutex;
 pthread_cond_t ready_queue_cv, thread_cv, ready_queue_io1_cv, ready_queue_io2_cv;
 
 void calculate_next_burst_length(PCB *pcb, SchedulingAlgorithm scheduling_algorithm)
@@ -38,8 +45,8 @@ void calculate_next_burst_length(PCB *pcb, SchedulingAlgorithm scheduling_algori
         }
         else if (strcmp(burst_dist, "exponential") == 0)
         {
-            // lamba sonra bulmatyı çöz
-            double lambda = 0.5; // temp currently
+            // TODO: implement exponential distribution
+            double lambda = 0.5;
             pcb->next_burst_length = min(pcb->remaining_burst_length,
                                          pcb->previous_burst_length * lambda + (1 - lambda) * burstlen);
         }
@@ -48,11 +55,13 @@ void calculate_next_burst_length(PCB *pcb, SchedulingAlgorithm scheduling_algori
 
 void *thread_function(void *arg)
 {
-    // printf("Thread %d created at time: %d\n", ((PCB *)arg)->pid, current_time);
-    queue *temp_rq = ready_queue;
+    // queue *temp_rq = ready_queue;
     PCB *pcb = (PCB *)arg;
     pcb->state = READY;
-    pcb->arrival_time = current_time;
+    pthread_mutex_lock(&time_mutex);
+    gettimeofday(&current_time, NULL);
+    pcb->arrival_time = (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - ((start_time_val));
+    pthread_mutex_unlock(&time_mutex);
     pcb->number_of_cpu_bursts = 0;
     pcb->thread_id = pthread_self();
     pcb->finish_time = 0;
@@ -61,10 +70,10 @@ void *thread_function(void *arg)
     pcb->time_spent_in_cpu = 0;
     pcb->time_spent_in_ready_queue = 0;
     pcb->previous_burst_length = burstlen;
-    pcb->last_ready_queue_enterance = current_time;
+    pcb->last_ready_queue_enterance = (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val);
     calculate_next_burst_length(pcb, scheduling_algorithm);
     pthread_mutex_lock(&ready_queue_mutex);
-    printf("Thread %d enqueued at time: %d\n", pcb->pid, current_time);
+    printf("Thread %d enqueued at time: %ld\n", pcb->pid, ((current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val)));
     enqueue(ready_queue, *pcb, scheduling_algorithm);
     --current_count;
     pthread_mutex_unlock(&ready_queue_mutex);
@@ -85,7 +94,10 @@ void *thread_function(void *arg)
         }
         pthread_mutex_unlock(&ready_queue_mutex);
         pthread_mutex_lock(&ready_queue_mutex);
-        printf("Thread %d dequeued at time: %d\n", pcb->pid, current_time);
+        pthread_mutex_lock(&time_mutex);
+        gettimeofday(&current_time, NULL);
+        printf("Thread %d dequeued at time: %ld\n", pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - start_time_val);
+        pthread_mutex_unlock(&time_mutex);
         node *temp = dequeue(ready_queue);
         PCB *temp_pcb = &(temp->data);
         cpu_running_thread_count++;
@@ -97,17 +109,22 @@ void *thread_function(void *arg)
             temp_pcb->state = RUNNING;
             temp_pcb->previous_burst_length = pcb->next_burst_length;
             temp_pcb->number_of_cpu_bursts = 0; // io giderse
-            temp_pcb->time_spent_in_ready_queue = current_time - temp_pcb->last_ready_queue_enterance;
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            temp_pcb->time_spent_in_ready_queue = (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - temp_pcb->last_ready_queue_enterance;
+            pthread_mutex_unlock(&time_mutex);
             temp_pcb->last_ready_queue_enterance = 0; // ready queue eklerken güncelle
             calculate_next_burst_length(temp_pcb, scheduling_algorithm);
             temp_pcb->time_spent_in_cpu += temp_pcb->next_burst_length; // after sleep
-            current_time += temp_pcb->next_burst_length;
             usleep(temp_pcb->next_burst_length * 1000);
             pthread_mutex_lock(&ready_queue_mutex);
             if (pcb->remaining_burst_length != 0)
             {
+                pthread_mutex_lock(&time_mutex);
+                gettimeofday(&current_time, NULL);
                 enqueue(ready_queue, *temp_pcb, scheduling_algorithm);
-                printf("Thread %d enqueued at time: %d\n", temp_pcb->pid, current_time);
+                printf("Thread %d enqueued at time: %ld\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val));
+                pthread_mutex_unlock(&time_mutex);
             }
             cpu_running_thread_count--;
             pthread_mutex_unlock(&ready_queue_mutex);
@@ -118,11 +135,13 @@ void *thread_function(void *arg)
             temp_pcb->state = RUNNING;
             temp_pcb->previous_burst_length = pcb->next_burst_length;
             temp_pcb->number_of_cpu_bursts = 0; // io giderse
-            temp_pcb->time_spent_in_ready_queue = current_time - temp_pcb->last_ready_queue_enterance;
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            temp_pcb->time_spent_in_ready_queue = current_time.tv_sec * 1000 + current_time.tv_usec / 1000 - temp_pcb->last_ready_queue_enterance;
+            pthread_mutex_unlock(&time_mutex);
             temp_pcb->last_ready_queue_enterance = 0; // ready queue eklerken güncelle
             calculate_next_burst_length(temp_pcb, scheduling_algorithm);
             temp_pcb->time_spent_in_cpu += temp_pcb->next_burst_length; // after sleep
-            current_time += temp_pcb->next_burst_length;
             usleep(temp_pcb->next_burst_length * 1000);
             temp_pcb->remaining_burst_length = 0;
             cpu_running_thread_count--;
@@ -144,18 +163,27 @@ void *thread_function(void *arg)
             }
             temp_pcb->state = USING_DEVICE_1;
             io1_count++;
-            printf("Thread %d is using IO1 at time: %d\n\n", temp_pcb->pid, current_time);
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            printf("Thread %d is using IO1 at time: %ld\n\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val));
+            pthread_mutex_unlock(&time_mutex);
             usleep(t1 * 1000);
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            pthread_mutex_unlock(&time_mutex);
             temp_pcb->number_of_io_device1++;
             temp_pcb->number_of_cpu_bursts++;
-            current_time += t1;
             io1_count--;
-            printf("Thread %d finished using IO1 at time: %d\n", temp_pcb->pid, current_time);
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            printf("Thread %d finished using IO1 at time: %ld\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val));
+            pthread_mutex_unlock(&time_mutex);
             pthread_mutex_unlock(&ready_queue_io1_mutex);
             pthread_cond_signal(&ready_queue_io1_cv);
             pthread_mutex_lock(&ready_queue_mutex);
             temp_pcb->state = READY;
             enqueue(ready_queue, *temp_pcb, scheduling_algorithm);
+            printf("Thread %d enqueued at time: %ld\n", pcb->pid, ((current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val)));
             pthread_mutex_unlock(&ready_queue_mutex);
             calculate_next_burst_length(temp_pcb, scheduling_algorithm);
             pthread_cond_broadcast(&ready_queue_cv);
@@ -168,15 +196,25 @@ void *thread_function(void *arg)
                 pthread_cond_wait(&ready_queue_io2_cv, &ready_queue_io2_mutex);
             }
             io2_count++;
-            printf("Thread %d is using IO2 at time: %d\n\n", temp_pcb->pid, current_time);
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            printf("Thread %d is using IO2 at time: %ld\n\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val));
+            pthread_mutex_unlock(&time_mutex);
             usleep(t2 * 1000);
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            printf("Thread %d finished using IO2 at time: %ld\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val));
             temp_pcb->number_of_io_device2++;
-            temp_pcb->number_of_io_device1++;
+            temp_pcb->number_of_cpu_bursts++;
             io2_count--;
-            printf("Thread %d finished using IO2 at time: %d\n", temp_pcb->pid, current_time);
+            pthread_mutex_unlock(&time_mutex);
             pthread_mutex_unlock(&ready_queue_io2_mutex);
             pthread_mutex_lock(&ready_queue_mutex);
             enqueue(ready_queue, *temp_pcb, scheduling_algorithm);
+            pthread_mutex_lock(&time_mutex);
+            gettimeofday(&current_time, NULL);
+            printf("Thread %d enqueued at time: %ld\n", pcb->pid, ((current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val)));
+            pthread_mutex_unlock(&time_mutex);
             pthread_mutex_unlock(&ready_queue_mutex);
             pthread_cond_signal(&ready_queue_io2_cv);
             calculate_next_burst_length(temp_pcb, scheduling_algorithm);
@@ -185,18 +223,22 @@ void *thread_function(void *arg)
     }
     // print threads
     --number_of_threads_left;
-    printf("Thread %d is ENDED at time: %d\n", pcb->pid, current_time);
+    pthread_mutex_lock(&time_mutex);
+    gettimeofday(&current_time, NULL);
+    printf("Thread %d is ENDED at time: %ld\n", pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val));
+    pthread_mutex_unlock(&time_mutex);
     pthread_exit(NULL);
 }
 
 void *generator_syscall(void *arg)
 {
-    burstlen = 30;
-    burst_dist = "fixed";
-    current_time = 0;
     int thread_count = 0;
     current_count = 0;
     current_cpu_pid = -1;
+    pthread_mutex_lock(&time_mutex);
+    gettimeofday(&start_time, NULL);
+    start_time_val = start_time.tv_sec * 1000 + start_time.tv_usec / 1000;
+    pthread_mutex_unlock(&time_mutex);
     if (allp < 10)
     {
         for (size_t i = 0; i < maxp; i++)
@@ -204,7 +246,6 @@ void *generator_syscall(void *arg)
             PCB *pcb = (PCB *)malloc(sizeof(PCB));
             pcb->pid = i;
             pthread_create(&threads[i], NULL, &thread_function, (void *)pcb);
-            // usleep(5000);
             ++current_count;
         }
         thread_count = maxp;
@@ -223,7 +264,6 @@ void *generator_syscall(void *arg)
                     thread_count++;
                 }
                 usleep(5000);
-                current_time += 5;
             }
         }
     }
@@ -252,16 +292,11 @@ void *generator_syscall(void *arg)
                     thread_count++;
                 }
                 usleep(5000);
-                current_time += 5;
             }
         }
     }
     return NULL;
 }
-/*
-systemsim <ALG> <Q> <T1> <T2> <burst-dist> <burstlen> <min-burst>
-<max-burst> <p0> <p1> <p2> <pg> <MAXP> <ALLP> <OUTMODE>
-*/
 
 void *scheduler_func(void *arg)
 {
@@ -274,16 +309,14 @@ void *scheduler_func(void *arg)
         else
         {
             pthread_mutex_lock(&ready_queue_mutex);
-            queue *temp_rq = ready_queue;
+            // queue *temp_rq = ready_queue;
             while (cpu_running_thread_count > 0)
             {
                 pthread_cond_wait(&ready_queue_cv, &ready_queue_mutex);
             }
             if (ready_queue->front != NULL)
             {
-                // pthread_mutex_lock(&ready_queue_mutex);
                 current_cpu_pid = ready_queue->front->data.pid;
-                // pthread_mutex_unlock(&ready_queue_mutex);
             }
             else
             {
@@ -301,12 +334,14 @@ int main(int argc, char *args[])
     pthread_mutex_init(&ready_queue_mutex, NULL);
     pthread_mutex_init(&ready_queue_io1_mutex, NULL);
     pthread_mutex_init(&ready_queue_io2_mutex, NULL);
+    pthread_mutex_init(&time_mutex, NULL);
     pthread_cond_init(&ready_queue_cv, NULL);
-    pthread_cond_init(&thread_cv, NULL);
     pthread_cond_init(&ready_queue_io1_cv, NULL);
-    pthread_cond_init(&thread_cv, NULL);
-    scheduling_algorithm = RR;
+    pthread_cond_init(&ready_queue_io2_cv, NULL);
+    scheduling_algorithm = FCFS;
     ready_queue = createQueue();
+    burst_dist = "fixed";
+    burstlen = 10;
     p0 = 0.3;
     max_burst = 60;
     min_burst = 30;
@@ -316,8 +351,8 @@ int main(int argc, char *args[])
     io1_count = 0;
     io2_count = 0;
     allp = 4;
-    t1 = 31;
-    t2 = 20;
+    t1 = 5;
+    t2 = 5;
     number_of_threads_left = allp;
     cpu_running_thread_count = 0;
     threads = (pthread_t *)malloc(sizeof(pthread_t) * allp);
@@ -335,6 +370,12 @@ int main(int argc, char *args[])
     pthread_mutex_destroy(&ready_queue_io1_mutex);
     pthread_mutex_destroy(&ready_queue_io2_mutex);
     pthread_mutex_destroy(&ready_queue_mutex);
-    // pthread_mutex_destroy(&thread_cv);
+    pthread_mutex_destroy(&time_mutex);
+    pthread_cond_destroy(&ready_queue_io1_cv);
+    pthread_cond_destroy(&ready_queue_io2_cv);
+    pthread_cond_destroy(&ready_queue_cv);
+    pthread_cond_destroy(&thread_cv);
+    free(threads);
+    destroyQueue(ready_queue);
     return 0;
 }
