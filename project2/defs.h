@@ -90,7 +90,7 @@ void enqueue(struct queue *q, PCB data, SchedulingAlgorithm sa)
                 new_node->next = temp;
                 temp->prev->next = new_node;
                 new_node->prev = temp->prev;
-                q->rear = new_node;
+                temp->prev = new_node;
             }
         }
     }
@@ -174,16 +174,51 @@ node *createNode(PCB data)
     return new_node;
 }
 
-int allTerminated(queue *queue)
+// write a c program that sorts the queue according to the pid in ascending order
+void sortQueue(struct queue *q)
 {
-    node *temp = queue->front;
+    if (isEmpty(q))
+    {
+        printf("Queue is empty\n");
+        return;
+    }
+    node *temp = q->front;
     while (temp != NULL)
     {
-        if (temp->data.state != TERMINATED)
+        node *temp2 = temp->next;
+        while (temp2 != NULL)
         {
-            return 0;
+            if (temp->data.pid > temp2->data.pid)
+            {
+                PCB temp_data = temp->data;
+                temp->data = temp2->data;
+                temp2->data = temp_data;
+            }
+            temp2 = temp2->next;
         }
         temp = temp->next;
     }
-    return 1;
+}
+
+//  write a c method that iterates through the queue and prints the data of each node
+void printQueueData(struct queue *q)
+{
+    if (isEmpty(q))
+    {
+        printf("Queue is empty\n");
+        return;
+    }
+
+    struct node *temp = q->front;
+    printf("pid\tarv\tdept\tcpu\twaitr\tturna\tn-bursts\tn-d1\tn-d2\n");
+    while (temp != NULL)
+    {
+        printf("%d\t%d\t%d\t%d\t%d\t%d\t%d\t\t%d\t%d\n", temp->data.pid,
+               temp->data.arrival_time, temp->data.finish_time, temp->data.time_spent_in_cpu,
+               (temp->data.finish_time - temp->data.arrival_time - temp->data.time_spent_in_cpu),
+               temp->data.finish_time - temp->data.arrival_time,
+               temp->data.number_of_cpu_bursts, temp->data.number_of_io_device1, temp->data.number_of_io_device2);
+        temp = temp->next;
+    }
+    printf("\n");
 }
