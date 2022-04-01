@@ -150,13 +150,9 @@ void *thread_function(void *arg)
             usleep(temp_pcb->next_burst_length * 1000);
             temp_pcb->remaining_burst_length -= temp_pcb->next_burst_length;
             pthread_mutex_lock(&ready_queue_mutex);
-            if (pcb->remaining_burst_length == 0)
+            if (temp_pcb->remaining_burst_length != 0) // bitiş
             {
                 pthread_mutex_lock(&time_mutex);
-                if (outmode == 3)
-                {
-                    printf("Q expired for thread %d at: %ld\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - start_time_val);
-                }
                 gettimeofday(&current_time, NULL);
                 temp_pcb->last_ready_queue_enterance = (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - temp_pcb->last_ready_queue_enterance;
                 enqueue(ready_queue, *temp_pcb, scheduling_algorithm);
@@ -165,6 +161,15 @@ void *thread_function(void *arg)
                     printf("Thread %d is added to the ready queue at time: %ld\n", pcb->pid, ((current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - (start_time_val)));
                 }
                 pthread_mutex_unlock(&time_mutex);
+                pthread_cond_broadcast(&ready_queue_cv);
+                continue;
+            }
+            else
+            {
+                if (outmode == 3)
+                {
+                    printf("Q expired for thread %d at: %ld\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - start_time_val);
+                }
             }
             cpu_running_thread_count--;
             pthread_mutex_unlock(&ready_queue_mutex);
@@ -180,7 +185,6 @@ void *thread_function(void *arg)
             pthread_mutex_unlock(&time_mutex);
             calculate_next_burst_length(temp_pcb, scheduling_algorithm);
             temp_pcb->time_spent_in_cpu += temp_pcb->next_burst_length;
-            usleep(temp_pcb->next_burst_length * 1000);
             pthread_mutex_lock(&time_mutex);
             if (outmode == 3)
             {
@@ -190,6 +194,7 @@ void *thread_function(void *arg)
             {
                 printf("%ld %d RUNNING\n", (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - start_time_val, temp_pcb->pid);
             }
+            usleep(temp_pcb->next_burst_length * 1000);
             pthread_mutex_unlock(&time_mutex);
             temp_pcb->remaining_burst_length = 0;
             cpu_running_thread_count--;
@@ -256,12 +261,12 @@ void *thread_function(void *arg)
             pthread_mutex_lock(&time_mutex);
             gettimeofday(&current_time, NULL);
             temp_pcb->last_ready_queue_enterance = (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - start_time_val;
-            pthread_mutex_unlock(&time_mutex);
             enqueue(ready_queue, *temp_pcb, scheduling_algorithm);
             if (outmode == 3)
             {
                 printf("Thread %d is added to the ready queue at time: %ld\n", temp_pcb->pid, (current_time.tv_sec * 1000 + current_time.tv_usec / 1000) - start_time_val);
             }
+            pthread_mutex_unlock(&time_mutex);
             pthread_mutex_unlock(&ready_queue_mutex);
             calculate_next_burst_length(temp_pcb, scheduling_algorithm);
             pthread_cond_broadcast(&ready_queue_cv);
@@ -455,7 +460,6 @@ int main(int argc, char *args[])
     pthread_cond_init(&ready_queue_cv, NULL);
     pthread_cond_init(&ready_queue_io1_cv, NULL);
     pthread_cond_init(&ready_queue_io2_cv, NULL);
-    // scheduling algorithm
     calculate_scheduling_algorithm(args[1]);
     if (scheduling_algorithm == RR)
     {
