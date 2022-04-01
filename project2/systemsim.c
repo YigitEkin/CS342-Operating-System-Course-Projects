@@ -50,8 +50,7 @@ void calculate_next_burst_length(PCB *pcb, SchedulingAlgorithm scheduling_algori
         }
         else if (strcmp(burst_dist, "exponential") == 0)
         {
-            pcb->next_burst_length =
-                (1.0 / (log(-1 * min_burst * burstlen) - log(-1 * max_burst * burstlen))) * (log(-1 * burstlen * min_burst) - log(-1 * burstlen * (rand() / RAND_MAX)));
+            pcb->next_burst_length = (int)(-1 * log(1 - ((float)rand() / RAND_MAX)) * (max_burst - min_burst + 1)) + min_burst;
         }
     }
 }
