@@ -1,6 +1,6 @@
-project2: systemsim.o
-	gcc -o project2 systemsim.o -lpthread
+systemsim: systemsim.o
+	gcc -o systemsim systemsim.o -lpthread
 systemsim.o:
 	gcc -c systemsim.c
 clean:
-	rm -f project2 systemsim.o systemsim
+	rm -f systemsim systemsim.o 
