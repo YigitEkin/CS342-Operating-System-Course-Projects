@@ -12,6 +12,7 @@
 #define min(x, y) (((x) < (y)) ? (x) : (y))
 
 // TODO: exponential distribution
+// TODO: RR implementation
 struct timeval start_time, current_time;
 char *burst_dist;
 SchedulingAlgorithm scheduling_algorithm;
