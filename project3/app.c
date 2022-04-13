@@ -1,12 +1,10 @@
-#include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
 #include "dma.h"
 // include the library interface
-int
-main (int argc, char ** argv)
-{
+/*
     void *p1;
     void *p2;
     void *p3;
@@ -27,4 +25,11 @@ exit(1); }
     dma_free (p2);
     dma_free (p3);
     dma_free (p4);
+*/
+
+
+int main (int argc, char ** argv)
+{
+    printf("%X",48);
+    return 0;
 }
