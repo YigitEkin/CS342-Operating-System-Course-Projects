@@ -22,7 +22,7 @@ int convert_to_hex(char* str) {
     }
     
     while (no != 0) {
-        val_to_return += pow;
+        //val_to_return += pow;
     }
 }
 
@@ -34,8 +34,8 @@ int calculate_closest_to16(int asked_amount) {
 
 int dma_init (int m) {
     //TODO: fix size
-    pthread_mutex_init(&segment_mutex);
-    pthread_mutex_init(&internal_fragmentation_mutex);
+    pthread_mutex_init(&segment_mutex, NULL);
+    pthread_mutex_init(&internal_fragmentation_mutex, NULL);
     segment = mmap(0, pow(2,m), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (segment == MAP_FAILED) {
         size = 0;
