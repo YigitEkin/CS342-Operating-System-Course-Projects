@@ -131,11 +131,11 @@ void  dma_print_page(int pno){
 }
 void  dma_print_bitmap(){ 
     pthread_mutex_lock(&segment_mutex);
-    for (size_t i = 1; i < size + 1; i++)
+    for (size_t i = 0; i < size; i++)
     {
-        if (i % 65 == 0) {
+        if ((i % 64 == 0) &&  (i !== 0)) {
             printf("\n");        
-        } else if (i % 9 == 0) {
+        } else if (i % 8 == 0 && (i !== 0)) {
             printf( " ");
         }
         printf("%d", segment[i]);
