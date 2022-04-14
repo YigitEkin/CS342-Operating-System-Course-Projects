@@ -6,24 +6,24 @@
 #define WORD_SIZE 8;
 #define PAGE_SIZE 4096;
 #define RESERVED_AREA_SIZE 256;
+#define BITMAP_RESERVED_AREA_SIZE 32;
 
 int* segment;
 size_t size, internal_fragmentation_size, bitmap_size; //bitmap size is in  bits 
 pthread_mutex_t segment_mutex, internal_fragmentation_mutex;
 
 //TODO: helper to print in hex which will be used for printing methods
-int convert_to_hex(char* str) {
-    int no = atoi(str);
-    int power_of_2 = 0;
-    int val_to_return = 0; 
-    if (no == 0)
-    {
-        return 0;
+//Write a method that converts a binary number to a hexadecimal number and returns it as a integer.
+int bin_to_hex(char* str){
+    int bin = atoi(str);
+    int hex = 0;
+    int i = 0;
+    while(bin != 0){
+        hex += (bin % 10) * pow(2,i);
+        bin /= 10;
+        i++;
     }
-    
-    while (no != 0) {
-        //val_to_return += pow;
-    }
+    return hex;
 }
 
 int calculate_closest_to16(int asked_amount) {
@@ -32,6 +32,38 @@ int calculate_closest_to16(int asked_amount) {
     return (int)(multiply_constant * 16);
 }
 
+
+int check_free_space(int curr_index, int asked_amount){
+    int i = 0;
+    while (i < asked_amount/WORD_SIZE) {
+        if (segment[curr_index + i] == 0) {
+            return 0;
+        }
+        i++;
+    }
+    return 1;
+}
+
+size_t find_free_space(int asked_amount){
+    size_t index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
+    while (index < bitmap_size) {
+        if (segment[index] == 1 && segment[index + 1] == 1) {
+            if (check_free_space(index, asked_amount)) {
+                return index;
+            }
+        }
+        if (segment[index] == 1 && segment[index - 1] == 0) {
+            index++;
+            while (segment[index] != 1) {
+                index++;
+            }
+            continue;
+        }
+        index++;            
+    }
+    return NULL;
+} 
+    
 int dma_init (int m) {
     //TODO: fix size
     pthread_mutex_init(&segment_mutex, NULL);
@@ -43,24 +75,23 @@ int dma_init (int m) {
     }
     size = pow(2,m);
     bitmap_size = size / WORD_SIZE;
-    size_t number_of_map_bits_for_bitmap = bitmap_size / pow(2,6);
 
     //! MAP BITMAP REGION TO BITMAP  
     segment[0] = 0; segment[1] = 1; //as the bitmap is allocated, the first 2 bits will be 01
-    for (size_t i = 2; i < number_of_map_bits_for_bitmap; i++)
+    for (size_t i = 2; i < bitmap_size; i++)
     {
         segment[i] = 0;
     }
     
     //!MAP SHARED AREA REGION TO BITMAP 
-    segment[number_of_map_bits_for_bitmap] = 0; segment[number_of_map_bits_for_bitmap + 1] = 1;
-    for (size_t i = 0; i < 8; i++)
+    segment[bitmap_size] = 0; segment[bitmap_size + 1] = 1;
+    for (size_t i = 0; i < 30; i++)
     {
-        segment[number_of_map_bits_for_bitmap + 2 + i] = 0;
+        segment[bitmap_size + 2 + i] = 0;
     }
 
     //! MAP ALLOCABLE AREA REGION TO BITMAP 
-    for (size_t i = number_of_map_bits_for_bitmap + 8; i < bitmap_size; i++)
+    for (size_t i = bitmap_size + 32; i < bitmap_size; i++)
     {
         segment[i] = 1;
     }
@@ -72,11 +103,15 @@ int dma_init (int m) {
 
 void *dma_alloc (int size) {
     int size_to_allocate = calculate_closest_to16(size);
-    for (size_t i = 0; i < bitmap_size; i++)
+    int bitmap_index = find_free_space(size_to_allocate);
+    segment[bitmap_index] = 0;
+    segment[bitmap_index + 1] = 1;
+    for (size_t i = 2; i < size_to_allocate/WORD_SIZE; i++)
     {
-        //TODO: search for size_to_allocate amount of consecutive 1 bits
+        segment[bitmap_index + i] = 0;
     }
     
+    //TODO: return address from allocated space
     internal_fragmentation_size += (size_to_allocate - size);
     //search for the first free page
     //update the bitmap

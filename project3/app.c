@@ -27,9 +27,19 @@ exit(1); }
     dma_free (p4);
 */
 
+int bin_to_hex(int bin){
+    int hex = 0;
+    int i = 0;
+    while(bin != 0){
+        hex += (bin % 10) * pow(2,i);
+        bin /= 10;
+        i++;
+    }
+    return hex;
+}
 
 int main (int argc, char ** argv)
 {
-    printf("%X",48);
+    printf("%X", bin_to_hex(10001111));
     return 0;
 }
