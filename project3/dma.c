@@ -123,6 +123,7 @@ void *dma_alloc (int size) {
 }
 
 //! There is a bug when two allocated blocks are located next to each other
+//! also edit internal fragmentation size
 void  dma_free (void *p) {
     size_t sharedmem_start_index = bitmap_size + 32;
     pthread_mutex_lock(&segment_mutex);
