@@ -3,12 +3,13 @@
 #include <pthread.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #define WORD_SIZE 8;
 #define PAGE_SIZE 4096;
 #define RESERVED_AREA_SIZE 256;
 #define BITMAP_RESERVED_AREA_SIZE 32;
 
-int* segment;
+char* segment;
 size_t size, internal_fragmentation_size, bitmap_size; //bitmap size is in  bits 
 pthread_mutex_t segment_mutex, internal_fragmentation_mutex;
 
@@ -36,7 +37,7 @@ int calculate_closest_to16(int asked_amount) {
 int check_free_space(int curr_index, int asked_amount){
     int i = 0;
     while (i < asked_amount/WORD_SIZE) {
-        if (segment[curr_index + i] == 0) {
+        if (strcmp(segment[curr_index + i], "0") == 0) {
             return 0;
         }
         i++;
@@ -44,17 +45,18 @@ int check_free_space(int curr_index, int asked_amount){
     return 1;
 }
 
+//TODO: can be implemented more efficiently
 size_t find_free_space(int asked_amount){
     size_t index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
     while (index < bitmap_size) {
-        if (segment[index] == 1 && segment[index + 1] == 1) {
+        if (strcmp(segment[index], "1") == 0 && strcmp(segment[index + 1], "1") == 0) {
             if (check_free_space(index, asked_amount)) {
                 return index;
             }
         }
-        if (segment[index] == 1 && segment[index - 1] == 0) {
+        if (strcmp(segment[index], "1") == 0 && strcmp(segment[index - 1], "0") == 0) {
             index++;
-            while (segment[index] != 1) {
+            while (strcmp(segment[index], "1") != 0) {
                 index++;
             }
             continue;
@@ -74,25 +76,26 @@ int dma_init (int m) {
     }
     size = pow(2,m);
     bitmap_size = size / WORD_SIZE;
+    size_t bitmap_mappable_size = bitmap_size / WORD_SIZE;
 
     // MAP BITMAP REGION TO BITMAP  
-    segment[0] = 0; segment[1] = 1; 
-    for (size_t i = 2; i < bitmap_size; i++)
+    segment[0] = "0"; segment[1] = "1"; 
+    for (size_t i = 2; i < bitmap_mappable_size; i++)
     {
-        segment[i] = 0;
+        segment[i] = "0";
     }
     
     // MAP SHARED AREA REGION TO BITMAP 
-    segment[bitmap_size] = 0; segment[bitmap_size + 1] = 1;
+    segment[bitmap_mappable_size] = "0"; segment[bitmap_mappable_size + 1] = "1";
     for (size_t i = 0; i < 30; i++)
     {
-        segment[bitmap_size + 2 + i] = 0;
+        segment[bitmap_mappable_size + 2 + i] = "0";
     }
 
     // MAP ALLOCABLE AREA REGION TO BITMAP 
-    for (size_t i = bitmap_size + 32; i < bitmap_size; i++)
+    for (size_t i = bitmap_mappable_size + 32; i < bitmap_size; i++)
     {
-        segment[i] = 1;
+        segment[i] = "1";
     }
     internal_fragmentation_size = 0;
     return 0;
@@ -106,48 +109,33 @@ void *dma_alloc (int size) {
         pthread_mutex_unlock(&segment_mutex);
         return NULL;
     }
-    segment[sharedmem_bitmap_index] = 0;
-    segment[sharedmem_bitmap_index + 1] = 1;
+    segment[sharedmem_bitmap_index] = "0";
+    segment[sharedmem_bitmap_index + 1] = "1";
     for (size_t i = 2; i < size_to_allocate/WORD_SIZE; i++)
     {
-        segment[sharedmem_bitmap_index + i] = 0;
+        segment[sharedmem_bitmap_index + i] = "0";
     }
     internal_fragmentation_size += (size_to_allocate - size);
 
-    //calculate the amount of displacement in shared memory region
     size_t sharedmem_bitmap_start_index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
     size_t sharedmem_displacement = sharedmem_bitmap_index - sharedmem_bitmap_start_index;
-    void* return_val =  segment + sharedmem_displacement + bitmap_size + 32;
+    int* return_val =  segment + sharedmem_displacement + bitmap_size + 32;
     pthread_mutex_unlock(&segment_mutex);
-    return return_val;
+    return (void*) return_val;
 }
 
 //! There is a bug when two allocated blocks are located next to each other
 //! also edit internal fragmentation size
 void  dma_free (void *p) {
-    /*size_t sharedmem_start_index = bitmap_size + 32;
-    pthread_mutex_lock(&segment_mutex);
-    size_t sharedmem_displacement = (int*)p - (segment + sharedmem_start_index);
-
-    size_t sharedmem_bitmap_start_index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
-    size_t starting_index_to_free_in_bitmap = sharedmem_bitmap_start_index + sharedmem_displacement;
-
-    segment[starting_index_to_free_in_bitmap++] = 1; //made 01 to 11
-    ++starting_index_to_free_in_bitmap; //skipped 1 index in 01
-
-    //made other 0 values to 1
-    while (segment[starting_index_to_free_in_bitmap] == 0) {
-        segment[starting_index_to_free_in_bitmap] = 1;
-        ++starting_index_to_free_in_bitmap;
-    }
-    pthread_mutex_unlock(&segment_mutex);*/
-
     pthread_mutex_lock(&segment_mutex);
     size_t sharedmem_start_index = bitmap_size + 32;
-    size_t sharedmem_displacement = (int*)p - sharedmem_start_index;
+    size_t sharedmem_displacement = (char*)p - (segment  + sharedmem_start_index);
+    size_t sharedmem_bitmap_start_index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
+    sharedmem_displacement += sharedmem_bitmap_start_index;
 
-    if (segment[sharedmem_displacement] == 0 && segment[sharedmem_displacement + 1] == 1 ) {
-        segment[sharedmem_displacement] = 1;
+    if (strcmp(segment[sharedmem_displacement], "0") == 0
+     && strcmp(segment[sharedmem_displacement + 1], "1") == 0 ) {
+        segment[sharedmem_displacement] = "1";
     }
     else {
         pthread_mutex_unlock(&segment_mutex);
@@ -155,14 +143,12 @@ void  dma_free (void *p) {
     }
     
     int i = 1;
-    while (segment[sharedmem_displacement + (2 * i)] == 0 && segment[sharedmem_displacement + (2 * i) + 1] == 0) {
-        segment[sharedmem_displacement + (2 * i)] = 1;
-        segment[sharedmem_displacement + (2 * i) + 1] = 1;
+    while (strcmp(segment[sharedmem_displacement + (2*i)], "0") == 0 &&
+     sstrcmp(segment[sharedmem_displacement + (2*i) + 1], "0") == 0) {
+        segment[sharedmem_displacement + (2 * i)] = "1";
+        segment[sharedmem_displacement + (2 * i) + 1] = "1";
         i++;
     } //if a bitwise pair is 01 or 11, loop terminates which means that the block is freed
-    
-    //TODO: decrement the internal fragmentation size
-
     pthread_mutex_unlock(&segment_mutex);
 }
 
@@ -192,12 +178,13 @@ void  dma_print_bitmap(){
         } else if (i % 8 == 0 && (i != 0)) {
             printf( " ");
         }
-        printf("%d", segment[i]);
+        printf("%s", segment[i]);
     }
     pthread_mutex_unlock(&segment_mutex);
 }
 
 void  dma_print_blocks(){ 
+
 }
 
 int dma_give_intfrag(){ 
