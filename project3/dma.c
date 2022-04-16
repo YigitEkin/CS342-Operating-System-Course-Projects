@@ -125,7 +125,7 @@ void *dma_alloc (int size) {
 //! There is a bug when two allocated blocks are located next to each other
 //! also edit internal fragmentation size
 void  dma_free (void *p) {
-    size_t sharedmem_start_index = bitmap_size + 32;
+    /*size_t sharedmem_start_index = bitmap_size + 32;
     pthread_mutex_lock(&segment_mutex);
     size_t sharedmem_displacement = (int*)p - (segment + sharedmem_start_index);
 
@@ -140,6 +140,29 @@ void  dma_free (void *p) {
         segment[starting_index_to_free_in_bitmap] = 1;
         ++starting_index_to_free_in_bitmap;
     }
+    pthread_mutex_unlock(&segment_mutex);*/
+
+    pthread_mutex_lock(&segment_mutex);
+    size_t sharedmem_start_index = bitmap_size + 32;
+    size_t sharedmem_displacement = (int*)p - sharedmem_start_index;
+
+    if (segment[sharedmem_displacement] == 0 && segment[sharedmem_displacement + 1] == 1 ) {
+        segment[sharedmem_displacement] = 1;
+    }
+    else {
+        pthread_mutex_unlock(&segment_mutex);
+        return NULL;
+    }
+    
+    int i = 1;
+    while (segment[sharedmem_displacement + (2 * i)] == 0 && segment[sharedmem_displacement + (2 * i) + 1] == 0) {
+        segment[sharedmem_displacement + (2 * i)] = 1;
+        segment[sharedmem_displacement + (2 * i) + 1] = 1;
+        i++;
+    } //if a bitwise pair is 01 or 11, loop terminates which means that the block is freed
+    
+    //TODO: decrement the internal fragmentation size
+
     pthread_mutex_unlock(&segment_mutex);
 }
 
