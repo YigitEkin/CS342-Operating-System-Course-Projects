@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #define WORD_SIZE 8;
 #define PAGE_SIZE 4096;
 #define RESERVED_AREA_SIZE 256;
@@ -36,7 +37,7 @@ int calculate_closest_to16(int asked_amount) {
 
 int check_free_space(int curr_index, int asked_amount){
     int i = 0;
-    while (i < asked_amount/WORD_SIZE) {
+    while (i < asked_amount/8) {
         if (strcmp(segment[curr_index + i], "0") == 0) {
             return 0;
         }
@@ -111,7 +112,7 @@ void *dma_alloc (int size) {
     }
     segment[sharedmem_bitmap_index] = "0";
     segment[sharedmem_bitmap_index + 1] = "1";
-    for (size_t i = 2; i < size_to_allocate/WORD_SIZE; i++)
+    for (size_t i = 2; i < size_to_allocate/8; i++)
     {
         segment[sharedmem_bitmap_index + i] = "0";
     }
@@ -139,12 +140,12 @@ void  dma_free (void *p) {
     }
     else {
         pthread_mutex_unlock(&segment_mutex);
-        return NULL;
+        return;
     }
     
     int i = 1;
     while (strcmp(segment[sharedmem_displacement + (2*i)], "0") == 0 &&
-     sstrcmp(segment[sharedmem_displacement + (2*i) + 1], "0") == 0) {
+     strcmp(segment[sharedmem_displacement + (2*i) + 1], "0") == 0) {
         segment[sharedmem_displacement + (2 * i)] = "1";
         segment[sharedmem_displacement + (2 * i) + 1] = "1";
         i++;
@@ -184,8 +185,52 @@ void  dma_print_bitmap(){
 }
 
 void  dma_print_blocks(){ 
+    size_t sharedmem_start_index = bitmap_size + 32;
+    size_t sharedmem_bitmap_start_index = 32 + bitmap_size/8;
+    size_t current_index = sharedmem_bitmap_start_index;
+    int current_block_size = 0;
 
+    pthread_mutex_lock(&segment_mutex);
+    while (current_index < size) {
+        //01 se (11 / 01) görene kadar 2 şerli arttır
+        //11 se 11 bitene kadar arttır   
+        if ( (segment[current_index] == 0) &&
+             (segment[current_index + 1] == 1)) {
+            printf("A, %p, ", segment + sharedmem_start_index + current_index);
+
+            current_block_size += 2;
+            current_index += 2;
+
+            while ((segment[current_index]!= 0) &&
+            (segment[current_index + 1]!= 0))
+            {
+                current_index += 2;
+                current_block_size += 2;
+            }
+
+            printf("%x, (%d)\n", current_block_size, current_block_size);
+
+            current_block_size = 0;
+            continue;
+
+        } else {
+            printf("F, %p, ", segment + sharedmem_start_index + current_index);
+            while ((segment[current_index]!= 1) &&
+                   (segment[current_index + 1] != 1)){
+                current_block_size += 2;
+                current_index += 2;
+            }
+            //print the free block
+            printf("%x, (%d)\n", current_block_size, current_block_size);
+
+            current_block_size = 0;
+            continue;
+        }
+    }    
+    pthread_mutex_unlock(&segment_mutex);
 }
+
+
 
 int dma_give_intfrag(){ 
     pthread_mutex_lock(&internal_fragmentation_mutex);
