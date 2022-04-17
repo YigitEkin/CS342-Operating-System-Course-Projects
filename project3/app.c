@@ -32,27 +32,26 @@ int main (int argc, char ** argv)
     void *p1;
     void *p2;
     void *p3;
-    void *p4;
+    double *p4;
     int ret;
-        printf ("something was wrong\n");
-
-    ret = dma_init (20); // create a segment of 1 MB
-        printf ("something was wrong\n");
-
+    ret = dma_init (14); // create a segment of 1 MB
     if (ret != 0) {
         printf ("something was wrong\n");
 exit(1); }
+    dma_print_bitmap();
     p1 = dma_alloc (100); // allocate space for 100 bytes
-        printf ("something was wrong\n");
-
     p2 = dma_alloc (1024);
     p3 = dma_alloc (64); //always check the return value
     p4 = dma_alloc (220);
     dma_free (p3);
     p3 = dma_alloc (2048);
+        printf ("something was wrong\n");
+
     dma_print_blocks();
     dma_free (p1);
     dma_free (p2);
     dma_free (p3);
     dma_free (p4);
+    dma_print_bitmap();
+    
 }
