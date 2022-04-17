@@ -111,67 +111,59 @@ int main (int argc, char ** argv)
     void *p4;
 
     struct timeval start, current;
-    struct timeval start_time, end_time;
+    double diff;
 
     printf("Allocation/Free Timing Test Case:\n");
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
-    usleep(1000000);
     p1 = dma_alloc (8192);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - current.tv_sec * 1000000 + current.tv_usec/1000000;
-    printf("Time taken for allocation of 8192 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for allocation of 8192 bytes: %f\n", diff);
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     p2 = dma_alloc (4096);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - current.tv_sec * 1000000 + current.tv_usec/1000000;
-    printf("Time taken for allocation of 4096 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for allocation of 4096 bytes: %f\n", diff);
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     p3 = dma_alloc (1024);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - current.tv_sec * 1000000 + current.tv_usec/1000000;
-    printf("Time taken for allocation of 1024 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for allocation of 1024 bytes: %f\n", diff);
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     p4 = dma_alloc (512);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - current.tv_sec * 1000000 + current.tv_usec/1000000;
-    printf("Time taken for allocation of 512 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for allocation of 512 bytes: %f\n", diff);
     
     dma_print_blocks();
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     dma_free (p1);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time.tv_sec * 1000000 + current.tv_usec/1000000;
-    printf("Time taken for freeing of 8192 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for freeing of 8192 bytes: %f\n", diff);
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     dma_free (p2);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time.tv_sec * 1000000 + start_time.tv_usec/1000000;
-    printf("Time taken for freeing of 4096 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for freeing of 4096 bytes: %f\n", diff);
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     dma_free (p3);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time.tv_sec * 1000000 + start_time.tv_usec/1000000;
-    printf("Time taken for freeing of 1024 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for freeing of 1024 bytes: %f\n", diff);
 
     gettimeofday(&start, NULL);
-    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
     dma_free (p4);
     gettimeofday(&current, NULL);
-    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time.tv_sec * 1000000 + start_time.tv_usec/1000000;
-    printf("Time taken for freeing of 512 bytes: %f\n", end_time);
+    diff = (current.tv_sec * 1000.0 + current.tv_usec/1000.0) - (start.tv_sec * 1000.0 + start.tv_usec/1000.0);
+    printf("Time taken for freeing of 512 bytes: %f\n", diff);
+
 
     dma_print_blocks();
     
