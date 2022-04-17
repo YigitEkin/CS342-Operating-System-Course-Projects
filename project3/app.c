@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
+#include <sys/time.h>
 #include "dma.h"
 // include the library interface
 /*
@@ -35,6 +36,7 @@ exit(1); }
 
 int main (int argc, char ** argv)
 {
+    /*
     void *p1;
     void *p2;
     void *p3;
@@ -95,9 +97,83 @@ int main (int argc, char ** argv)
     dma_free (p2);
     dma_free (p3);
     dma_free (p4);
-    dma_free (p5);
+    dma_free (p5);*/
 
+    struct timeval start, current;
+    long int start_time, end_time;
 
+    int ret;
+    ret = dma_init (14); // create a segment of 1 MB
+    if (ret != 0) {
+        printf ("something was wrong\n");
+    exit(1); }
 
+    void *p1;
+    void *p2;
+    void *p3;
+    void *p4;
+
+    printf("Allocation/Free Timing Test Case:\n");
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    usleep(1000000);
+    p1 = dma_alloc (8192);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for allocation of 8192 bytes: %ld\n", end_time);
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    p2 = dma_alloc (4096);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for allocation of 4096 bytes: %ld\n", end_time);
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    p3 = dma_alloc (1024);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for allocation of 1024 bytes: %ld\n", end_time);
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    p4 = dma_alloc (512);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for allocation of 512 bytes: %ld\n", end_time);
+    
+    dma_print_blocks();
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    dma_free (p1);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for freeing of 8192 bytes: %ld\n", end_time);
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    dma_free (p2);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for freeing of 4096 bytes: %ld\n", end_time);
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    dma_free (p3);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for freeing of 1024 bytes: %ld\n", end_time);
+
+    gettimeofday(&start, NULL);
+    start_time = start.tv_sec * 1000000 + start.tv_usec/1000000;
+    dma_free (p4);
+    gettimeofday(&current, NULL);
+    end_time = current.tv_sec * 1000000 + current.tv_usec/1000000 - start_time;
+    printf("Time taken for freeing of 512 bytes: %ld\n", end_time);
+
+    dma_print_blocks();
+    
     return 0;
 }
