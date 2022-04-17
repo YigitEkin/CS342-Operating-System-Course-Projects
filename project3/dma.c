@@ -10,22 +10,29 @@
 #define RESERVED_AREA_SIZE 256;
 #define BITMAP_RESERVED_AREA_SIZE 32;
 
-int* segment;
+double* segment;
 size_t size, internal_fragmentation_size, bitmap_size; //bitmap size is in  bits 
 pthread_mutex_t segment_mutex, internal_fragmentation_mutex;
 
 //TODO: helper to print in hex which will be used for printing methods
 //Write a method that converts a binary number to a hexadecimal number and returns it as a integer.
-int bin_to_hex(char* str){
-    int bin = atoi(str);
+void bin_to_hex(int* page){
     int hex = 0;
-    int i = 0;
-    while(bin != 0){
-        hex += (bin % 10) * pow(2,i);
-        bin /= 10;
-        i++;
+    int index = 0;
+    while (index < 4096)
+    {
+        hex = page[index] * pow(2, 3)+
+        page[index+1] * pow(2, 2)+
+        page[index+2] * pow(2, 1)+
+        page[index+3] * pow(2, 0);
+        index += 4;
+
+        printf("%x", hex);
+        if ((index) % 256 == 0)
+        {
+            printf("\n");
+        }
     }
-    return hex;
 }
 
 int calculate_closest_to16(int asked_amount) {
@@ -70,7 +77,7 @@ size_t find_free_space(int asked_amount){
 int dma_init (int m) {
     pthread_mutex_init(&segment_mutex, NULL);
     pthread_mutex_init(&internal_fragmentation_mutex, NULL);
-    segment = mmap(0, pow(2,m) * sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    segment = mmap(0, pow(2,m) * sizeof(double), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (segment == MAP_FAILED) {
         size = 0;
         return -1;
@@ -99,6 +106,7 @@ int dma_init (int m) {
         segment[i] = 1;
     }
     
+    
     internal_fragmentation_size = 0;
     return 0;
 }
@@ -121,22 +129,20 @@ void *dma_alloc (int size) {
 
     size_t sharedmem_bitmap_start_index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
     size_t sharedmem_displacement = sharedmem_bitmap_index - sharedmem_bitmap_start_index;
-    int* return_val =  segment + sharedmem_displacement + bitmap_size + 32;
+    double* return_val =  segment + sharedmem_displacement + bitmap_size + 32;
     pthread_mutex_unlock(&segment_mutex);
 
-    return (int*) return_val;
+    return (void*) return_val;
 }
 
-//! There is a bug when two allocated blocks are located next to each other
-//! also edit internal fragmentation size
 void  dma_free (void *p) {
     pthread_mutex_lock(&segment_mutex);
     size_t sharedmem_start_index = bitmap_size + 32;
-    size_t sharedmem_displacement = (int*)p - (segment  + sharedmem_start_index);
+    size_t sharedmem_displacement = (double*)p - (segment  + sharedmem_start_index);
     size_t sharedmem_bitmap_start_index = BITMAP_RESERVED_AREA_SIZE + bitmap_size/WORD_SIZE;
     sharedmem_displacement += sharedmem_bitmap_start_index;
 
-    if (segment[sharedmem_displacement] == 0 && segment[sharedmem_displacement + 1] == 1 ) {
+    if (segment[sharedmem_displacement] == 0 && segment[sharedmem_displacement + 1] == 1) {
         segment[sharedmem_displacement] = 1;
     }
     else {
@@ -145,7 +151,7 @@ void  dma_free (void *p) {
     }
     
     int i = 1;
-    while (segment[sharedmem_displacement + (2*i)] == 0 && segment[sharedmem_displacement + (2*i) + 1] == 0) {
+    while (segment[sharedmem_displacement + (2*i)] == 0 && segment[sharedmem_displacement + (2*i) + 1] == 0 && sharedmem_displacement + (2*i) < bitmap_size) {
         segment[sharedmem_displacement + (2 * i)] = 1;
         segment[sharedmem_displacement + (2 * i) + 1] = 1;
         i++;
@@ -159,15 +165,16 @@ void  dma_print_page(int pno){
     size_t page_starting_index = pno * 4096;
     size_t index = 0;
     //create a string to print
-    char str[4096];
+    int page[4096];
     //while index < 64 append segment[index] to str
-    while (index < 4096 && index < size) {
+    while (index < 4096 && (page_starting_index + index) < size) {
         pthread_mutex_lock(&segment_mutex);
-        str[index] = segment[page_starting_index + index];
+        //printf("%d", (int)segment[page_starting_index + index]);
+        page[index] = (unsigned int)segment[page_starting_index + index];
         index++;
         pthread_mutex_unlock(&segment_mutex);
     }
-    printf("%s\n",bin_to_hex(str));
+    bin_to_hex(page);
 }
 
 void  dma_print_bitmap(){ 
@@ -179,7 +186,7 @@ void  dma_print_bitmap(){
         } else if (i % 8 == 0 && (i != 0)) {
             printf( " ");
         }
-        printf("%d", segment[i]);
+        printf("%d", (int)segment[i]);
     }
     pthread_mutex_unlock(&segment_mutex);
     printf("\n\n");
@@ -203,13 +210,13 @@ void  dma_print_blocks(){
             current_index += 2;
 
             while ((segment[current_index]== 0) &&
-            (segment[current_index + 1]== 0))
+            (segment[current_index + 1]== 0) && current_index < bitmap_size) 
             {
                 current_index += 2;
                 current_block_size += 2;
             }
 
-            printf("%x, (%d)\n", current_block_size, current_block_size);
+            printf("0x%x, (%d)\n", (current_block_size * 8), (current_block_size * 8));
 
             current_block_size = 0;
             continue;
@@ -217,12 +224,12 @@ void  dma_print_blocks(){
         } else {
             printf("F, %p, ", segment + sharedmem_start_index + current_index);
             while ((segment[current_index] == 1) &&
-                   (segment[current_index + 1] == 1)){
+                   (segment[current_index + 1] == 1) && current_index < bitmap_size) {
                 current_block_size += 2;
                 current_index += 2;
             }
             //print the free block
-            printf("%x, (%d)\n", current_block_size, current_block_size);
+            printf("0x%x, (%d)\n", (current_block_size * 8), (current_block_size * 8));
 
             current_block_size = 0;
             continue;
