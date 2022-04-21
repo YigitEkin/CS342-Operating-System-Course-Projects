@@ -1,8 +1,11 @@
+all: histclient_th histclient histserver histserver_th
+histclient_th: histclient_th.c
+	gcc -Wall -o histclient_th histclient_th.c -lrt -pthread
 histserver_th: histserver_th.c
-	gcc -g -pthread histserver_th.c -o histserver_th
-histclient_th: histclient_th.o
-	gcc -o histclient_th histclient_th.o 
-histclient_th.o: histclient_th.c
-	gcc -c histclient_th.c
+	gcc -Wall -o histserver_th histserver_th.c -lrt -pthread
+histclient: histclient.c
+	gcc -Wall -o histclient histclient.c -lrt
+histserver: histserver.c
+	gcc -Wall -o histserver histserver.c -lrt
 clean:
-	rm -f histserver_th histclient_th a.out
+	rm -f histserver_th histclient_th histserver histclient
